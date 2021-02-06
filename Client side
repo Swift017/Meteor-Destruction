@@ -1,0 +1,270 @@
+--| Swift
+
+--| Services
+local Players = game.Players;
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService");
+
+--| Rex
+local Rex = require(ReplicatedStorage.Rex);
+local Math = Rex.Math;
+local Globals = require(ReplicatedStorage.Modules.Globals);
+local DebrisService = Rex:GetModule("DebrisService");
+local HitboxService = Rex:GetModule("HitboxService")
+local VFXService = Rex:GetModule("VFXService");
+local RayService = Rex:GetModule("RayService");
+local AnimationModule = Rex:GetModule("AnimationModule");
+local TaskScheduler = Rex:GetModule("TaskScheduler")
+
+--| Explosion Function
+local function Explosion(Result, Size, Character)
+	
+	-- { Rock Debris
+	VFXService.CircularRockDebris({
+		Pos = Result.Position, 
+		Quantity = 22, 
+		Radius = Size,
+		Size = Vector3.new(6,6,6), 
+		Duration = 2, 
+	})
+	-- }
+	
+	if Character.Name == Players.LocalPlayer.Name then
+		VFXService.Shake("RoughExplosion");
+	end
+	
+	-- { Rocks
+	for i = 1, 15 do
+		local Rock = ReplicatedStorage.Assets.Esper.Swift.Rock:Clone()
+		Rock.Position = Result.Position
+		Rock.Material = Result.Material;
+		Rock.Color = Result.Instance.Color;
+		Rock.Orientation = Vector3.new(math.random(-100,100), math.random(-100,100), math.random(-100,100))
+		Rock.Parent = game.Workspace.Visuals
+		DebrisService:AddItem(Rock, 3)
+
+		local BodyVelocity = Instance.new("BodyVelocity")
+		BodyVelocity.Velocity = Vector3.new(math.random(-100,100),math.random(75,150),math.random(-100,100))
+		BodyVelocity.MaxForce = Vector3.new(100000,100000,100000)
+		BodyVelocity.Parent = Rock
+		DebrisService:AddItem(BodyVelocity, .1)
+	end
+	-- }
+
+	-- { Orbies
+	local ValueX = math.random(3,7)
+	local ValueZ = math.random(3,7)
+
+	VFXService.SpreadedOrbies({
+		Quantity = 7;
+		Pos = Result.Position, 
+		Properties = {
+			Material = Enum.Material.Neon;
+			Transparency = 0;
+			Size = Vector3.new(1,1,math.random(5,12));
+		};
+		Offsets = {
+			X = {-ValueX, ValueX};
+			Y = {0, 10};
+			Z = {-ValueZ, ValueZ};
+			Offset = {10,20};
+		};
+		TweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out);
+		Goal = {Transparency = 1, Size = Vector3.new(0,0,math.random(5,8))};
+	})
+	-- }
+	
+	-- { Dust Particles
+	local DustParticles = ReplicatedStorage.Assets.General.DustParticles:Clone();
+	DustParticles.CFrame = CFrame.new(Result.Position + Vector3.new(0,Size/2,0));
+	DustParticles.FallingDust.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,Size/2), NumberSequenceKeypoint.new(1,Size/2)})
+	DustParticles.FallingDust.Color = ColorSequence.new({ColorSequenceKeypoint.new(0,Result.Instance.Color), ColorSequenceKeypoint.new(1, Result.Instance.Color)});
+	DustParticles.RockParticles.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,Size/12), NumberSequenceKeypoint.new(1,Size/12)})
+	DustParticles.RockParticles.Speed = NumberRange.new(Size, Size)
+	DustParticles.RockParticles.Color = ColorSequence.new({ColorSequenceKeypoint.new(0,Result.Instance.Color), ColorSequenceKeypoint.new(1, Result.Instance.Color)});
+	DustParticles.Size = Vector3.new(1,1,1) * Size;
+	DustParticles.Parent = game.Workspace.Visuals;
+	VFXService.Emit(DustParticles.FallingDust, 30);
+	VFXService.Emit(DustParticles.RockParticles, 10);
+	DebrisService:AddItem(DustParticles, DustParticles.FallingDust.Lifetime.Max);
+	-- }
+
+	VFXService.PlaySound("Explosion", {Parent = DustParticles, Volume = 3});
+	
+	-- { Explosion -- placeholder
+	local EsperExplosion = ReplicatedStorage.Assets.Esper.Swift.EsperExplosion:Clone()
+	EsperExplosion.Position = Result.Position + Vector3.new(0,Size/2,0);
+	EsperExplosion.Size = Vector3.new(1,1,1) * Size
+	EsperExplosion.Parent = game.Workspace.Visuals
+	DebrisService:AddItem(EsperExplosion, 3.5)
+	-- }
+	
+	-- { Particles
+	local Particle = EsperExplosion.ParticleEmitter
+	Particle.Speed = NumberRange.new(Size/2, Size);
+	local pWeen = TweenService:Create(Particle, TweenInfo.new(1), {LightEmission = 1})
+	pWeen:Play();
+	pWeen:Destroy();
+	VFXService.Emit(Particle, 70);
+
+	local LargerParticles = EsperExplosion["Larger Particles"];
+	LargerParticles.Speed = NumberRange.new(Size/2, Size);
+	VFXService.Emit(LargerParticles, 30);
+
+	local SmallerParticles = EsperExplosion["Smaller Particles"];
+	SmallerParticles.Speed = NumberRange.new(Size/2, Size);
+	SmallerParticles.Parent = EsperExplosion;
+	VFXService.Emit(SmallerParticles, 50);
+	
+	--| Rewrote ;
+	for i = 1, 5 do
+		local Shockwave = ReplicatedStorage.Assets.Esper.Swift.Swirls:Clone()
+		Shockwave.Position = Result.Position
+		Shockwave.Parent = game.Workspace.Visuals
+		DebrisService:AddItem(Shockwave, 2)
+		
+		local RandomSize = Size * (2 + 2 * math.random());
+		
+		local Expand = TweenService:Create(Shockwave, TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = Vector3.new(RandomSize, 2, RandomSize)})
+		Expand:Play()
+		Expand:Destroy()
+		
+		local Spin = TweenService:Create(Shockwave, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, -1), {Orientation = Shockwave.Orientation + Vector3.new(0,360,0)})
+		Spin:Play();
+		Spin:Destroy()
+		-- }
+
+		local Pillow = TweenService:Create(Shockwave, TweenInfo.new(0.5 + math.random(), Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0), {Position = Shockwave.Position + Vector3.new(0, math.random(5,50),0), Transparency = 1})
+		Pillow:Play();
+		Pillow:Destroy()
+	end
+	
+	
+	-- { Crack
+	local Result = RayService:Cast(
+		Result.Position + Vector3.new(0,5,0),
+		Result.Position - Vector3.new(0,50,0),
+		{game.Workspace.Visuals, game.Workspace.Entities},
+		Enum.RaycastFilterType.Blacklist 
+	)
+	
+	if Result then
+		local Crack = ReplicatedStorage.Assets.Esper.Swift.Crack:Clone()
+		Crack.Position = Result.Position
+		Crack.Transparency = 0
+		Crack.Size = Vector3.new(0,0,0);
+		Crack.Material = Result.Material;
+		Crack.Color = Result.Instance.Color;
+		Crack.Parent = game.Workspace.Visuals
+		
+		Crack.PointLight.Brightness = 0;
+		Crack.PointLight.Range = 0;
+		
+		local Animate = TweenService:Create(Crack.PointLight, TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, true), {Brightness = 15, Range = Size})
+		Animate:Play();
+		Animate:Destroy();
+		
+		DebrisService:AddItem(Crack, 3)
+		
+		local Animate = TweenService:Create(Crack, TweenInfo.new(0.5, Enum.EasingStyle.Linear), {Size = Vector3.new(Size*2,Size*2,1)});
+		Animate:Play();
+		Animate:Destroy();
+		
+		local Disappear = TweenService:Create(Crack, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out, 0, false, 2), {Transparency = 1})
+		Disappear:Play()
+		Disappear:Destroy()
+	end
+	-- }
+end
+
+return function(Data)
+	-- Retrieved Data
+	local MouseHit = Data.MouseHit;
+	local Size = Data.Size;
+	local Velocity = Data.Velocity;
+	local Lifetime = Data.Lifetime;
+	local SpawnCFrame = Data.SpawnPoint;
+	
+	-- Character
+	local Character = Data.Character;
+	local RootPart = Character:FindFirstChild("HumanoidRootPart");
+	
+	if Character.Name == game.Players.LocalPlayer.Name then
+		AnimationModule.Play("Meteor Slam");
+	end
+	
+	--| Character Glow
+	local GlowingParts = {};
+	local CharacterChildren = Character:GetChildren()
+	for i = 1, #CharacterChildren do
+		local Child = CharacterChildren[i];
+		if Child:IsA("BasePart") then
+			local Copy = Child:Clone();
+			Copy.Massless = true;
+			Copy.CastShadow = false;
+			Copy.Anchored = false;
+			Copy.Transparency = 1;
+			Copy.Material = Enum.Material.ForceField;
+			Copy.Color = Color3.fromRGB(0, 255, 0)
+			--Copy.Size = Copy.Size * 1.05;
+			Copy.CanCollide = false;
+			Copy.Parent = game.Workspace.Visuals;
+			GlowingParts[#GlowingParts + 1] = Copy;
+
+			local Children = Copy:GetChildren()
+			for i = 1, #Children do
+				local Child = Children[i];
+				Child:Destroy();
+			end
+
+			local WeldConstraint = Instance.new("WeldConstraint");
+			WeldConstraint.Part0 = Child;
+			WeldConstraint.Part1 = Copy;
+			WeldConstraint.Parent = Copy;
+
+			local Animate = TweenService:Create(Copy, TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 0), {Transparency = 0.5, Size = Copy.Size * 1.05});
+			Animate:Play();
+			Animate:Destroy();
+		end
+	end;
+	DebrisService:AddItem(GlowingParts, 4);
+		
+	--| Meteor
+	local Meteor = ReplicatedStorage.Assets.Esper.Swift.Meteor:Clone()
+	Meteor.CFrame = SpawnCFrame
+	Meteor.Parent = game.Workspace.Visuals
+	VFXService.PlaySound("Projectile Woosh", {Parent = Meteor, Volume = 4});
+
+	local Size = ReplicatedStorage.Assets.Esper.Swift.Meteor.Size.X;
+	local Points = HitboxService:GetSquarePoints(SpawnCFrame, Size, Size);
+	HitboxService:CastProjectileHitbox({ -- Everything is required
+		Points = Points, -- Array Of CFrames
+		Direction = (MouseHit.Position - SpawnCFrame.Position).Unit, -- Direction
+		Velocity = Velocity, -- Velocity Of Projectile
+		Lifetime = Lifetime, -- Total Duration 
+		Iterations = 50, -- Amount of times it's splitted,
+		Visualize = false, -- Visualizes the hitbox using RayService
+		Function = function(RaycastResult) -- Callback
+			Meteor:Destroy();
+			Explosion(RaycastResult, Size, Character)
+		end,
+		Ignore = {Character, game.Workspace.Visuals} -- Array Of Objects To be Ignored
+	})
+	
+	--| Make Meteor Move
+	local Animate = TweenService:Create(Meteor, TweenInfo.new(Lifetime, Enum.EasingStyle.Linear), {CFrame = Meteor.CFrame * CFrame.new(0,0,-Velocity * Lifetime)})
+	Animate:Play();
+	Animate:Destroy();
+	DebrisService:AddItem(Meteor, Lifetime);
+	
+	TaskScheduler:AddTask(0.5, function()
+		--| Remove Glow
+		for i = 1, #GlowingParts do
+			local Part = GlowingParts[i];
+			local Animate = TweenService:Create(Part, TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = Part.Size * 1.5, Transparency = 1});
+			Animate:Play();
+			Animate:Destroy();
+		end
+	end)
+end
