@@ -1,3 +1,4 @@
+```lua
 -- Swift
 
 -- Services
@@ -59,3 +60,4 @@ return function(Player, MouseHit, SkillData)
 	end)
 	wait(0.5);
 end
+```
